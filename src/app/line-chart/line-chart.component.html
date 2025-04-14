@@ -1,0 +1,13 @@
+<div class="chart-container">
+  <div
+    *ngIf="isBrowser"
+    echarts
+    [options]="chartOption"
+    (chartInit)="onChartInit($event)"
+    class="demo-chart"
+  ></div>
+
+  <div *ngIf="!isBrowser" class="chart-placeholder">
+    <p>Chart will be rendered on the client side</p>
+  </div>
+</div>
