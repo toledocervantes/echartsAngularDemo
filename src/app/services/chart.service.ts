@@ -12,7 +12,7 @@ export class ChartService {
 
   constructor() {}
 
-  generateSeries(seriesCount: number = 28, pointCount: number = 4032): any[] {
+  generateSeries(seriesCount: number = 5, pointCount: number = 4032): any[] {
     this.startTime = Date.now() - pointCount * 5 * 60 * 1000;
     this.series = [];
 
@@ -50,7 +50,7 @@ export class ChartService {
   createChartOptions(series: any[]): EChartsOption {
     const totalPoints = series.reduce((sum, s) => sum + s.data.length, 0);
 
-    if (totalPoints > 500000) {
+    if (totalPoints > 5000000) {
       return this.createWarningOptions('⚠️ Too many ONTs selected');
     }
 
@@ -67,6 +67,7 @@ export class ChartService {
         min: this.startTime,
         max: this.startTime + 4032 * 5 * 60 * 1000,
         interval: 24 * 60 * 60 * 1000,
+        // interval: 5 * 60 * 1000,
         axisLabel: {
           formatter: (value: number) => {
             const date = new Date(value);
@@ -161,5 +162,59 @@ export class ChartService {
 
   getSeries(): any[] {
     return this.series;
+  }
+
+  doesLineIntersectBrushArea(
+    xRange: number[],
+    yRange: number[],
+    data: [number, number][]
+  ): boolean {
+    const rect = {
+      xMin: xRange[0],
+      xMax: xRange[1],
+      yMin: yRange[0],
+      yMax: yRange[1],
+    };
+
+    const inside = (x: number, y: number) =>
+      x >= rect.xMin && x <= rect.xMax && y >= rect.yMin && y <= rect.yMax;
+
+    const intersectsLine = (
+      x1: number,
+      y1: number,
+      x2: number,
+      y2: number,
+      x3: number,
+      y3: number,
+      x4: number,
+      y4: number
+    ) => {
+      const det = (x2 - x1) * (y4 - y3) - (y2 - y1) * (x4 - x3);
+      if (det === 0) return false;
+
+      const lambda = ((y4 - y3) * (x4 - x1) + (x3 - x4) * (y4 - y1)) / det;
+      const gamma = ((y1 - y2) * (x4 - x1) + (x2 - x1) * (y4 - y1)) / det;
+
+      return lambda >= 0 && lambda <= 1 && gamma >= 0 && gamma <= 1;
+    };
+
+    for (let i = 0; i < data.length - 1; i++) {
+      const [x1, y1] = data[i];
+      const [x2, y2] = data[i + 1];
+
+      if (inside(x1, y1) || inside(x2, y2)) return true;
+
+      const { xMin, xMax, yMin, yMax } = rect;
+      if (
+        intersectsLine(x1, y1, x2, y2, xMin, yMin, xMax, yMin) || // top
+        intersectsLine(x1, y1, x2, y2, xMax, yMin, xMax, yMax) || // right
+        intersectsLine(x1, y1, x2, y2, xMax, yMax, xMin, yMax) || // bottom
+        intersectsLine(x1, y1, x2, y2, xMin, yMax, xMin, yMin) // left
+      ) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

@@ -99,19 +99,19 @@ export class LineChartComponent implements OnInit, OnDestroy {
       .pipe(
         filter((params: any) => params?.areas?.[0]?.coordRange?.length > 0),
         map((params: any) => {
+          console.log('params:', params);
           const [xRange, yRange] = params.areas[0].coordRange;
           const highlightedIds: string[] = [];
           const series = this.chartService.getSeries();
 
           for (const serie of series) {
-            const inRangePoints = serie.data.filter(
-              ([x, y]: [number, number]) =>
-                x >= xRange[0] &&
-                x <= xRange[1] &&
-                y >= yRange[0] &&
-                y <= yRange[1]
-            );
-            if (inRangePoints.length > 0) {
+            if (
+              this.chartService.doesLineIntersectBrushArea(
+                xRange,
+                yRange,
+                serie.data
+              )
+            ) {
               highlightedIds.push(serie.id);
             }
           }
