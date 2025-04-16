@@ -165,21 +165,32 @@ export class ChartService {
   }
 
   doesLineIntersectBrushArea(
-    xRange: number[],
-    yRange: number[],
+    xRange: [number, number],
+    yRange: [number, number],
     data: [number, number][]
   ): boolean {
-    const rect = {
+    // Early return for empty data
+    if (!data || data.length < 2) {
+      return false;
+    }
+
+    // Define the brush rectangle boundaries
+    const brushRect = {
       xMin: xRange[0],
       xMax: xRange[1],
       yMin: yRange[0],
       yMax: yRange[1],
     };
 
-    const inside = (x: number, y: number) =>
-      x >= rect.xMin && x <= rect.xMax && y >= rect.yMin && y <= rect.yMax;
+    // Check if a point is inside the brush rectangle
+    const isPointInside = (x: number, y: number): boolean =>
+      x >= brushRect.xMin &&
+      x <= brushRect.xMax &&
+      y >= brushRect.yMin &&
+      y <= brushRect.yMax;
 
-    const intersectsLine = (
+    // Check if two line segments intersect
+    const doSegmentsIntersect = (
       x1: number,
       y1: number,
       x2: number,
@@ -188,29 +199,53 @@ export class ChartService {
       y3: number,
       x4: number,
       y4: number
-    ) => {
+    ): boolean => {
+      // Calculate the determinant
       const det = (x2 - x1) * (y4 - y3) - (y2 - y1) * (x4 - x3);
-      if (det === 0) return false;
 
+      // Lines are parallel if determinant is zero
+      if (Math.abs(det) < 1e-10) {
+        return false;
+      }
+
+      // Calculate intersection parameters
       const lambda = ((y4 - y3) * (x4 - x1) + (x3 - x4) * (y4 - y1)) / det;
       const gamma = ((y1 - y2) * (x4 - x1) + (x2 - x1) * (y4 - y1)) / det;
 
+      // Check if intersection is within both line segments
       return lambda >= 0 && lambda <= 1 && gamma >= 0 && gamma <= 1;
     };
 
+    // Check if a line segment intersects with any edge of the brush rectangle
+    const intersectsWithRectEdge = (
+      x1: number,
+      y1: number,
+      x2: number,
+      y2: number
+    ): boolean => {
+      const { xMin, xMax, yMin, yMax } = brushRect;
+
+      // Check intersection with each edge of the rectangle
+      return (
+        doSegmentsIntersect(x1, y1, x2, y2, xMin, yMin, xMax, yMin) || // top edge
+        doSegmentsIntersect(x1, y1, x2, y2, xMax, yMin, xMax, yMax) || // right edge
+        doSegmentsIntersect(x1, y1, x2, y2, xMax, yMax, xMin, yMax) || // bottom edge
+        doSegmentsIntersect(x1, y1, x2, y2, xMin, yMax, xMin, yMin) // left edge
+      );
+    };
+
+    // Check each line segment in the series
     for (let i = 0; i < data.length - 1; i++) {
       const [x1, y1] = data[i];
       const [x2, y2] = data[i + 1];
 
-      if (inside(x1, y1) || inside(x2, y2)) return true;
+      // Quick check: if either endpoint is inside the brush area, return true
+      if (isPointInside(x1, y1) || isPointInside(x2, y2)) {
+        return true;
+      }
 
-      const { xMin, xMax, yMin, yMax } = rect;
-      if (
-        intersectsLine(x1, y1, x2, y2, xMin, yMin, xMax, yMin) || // top
-        intersectsLine(x1, y1, x2, y2, xMax, yMin, xMax, yMax) || // right
-        intersectsLine(x1, y1, x2, y2, xMax, yMax, xMin, yMax) || // bottom
-        intersectsLine(x1, y1, x2, y2, xMin, yMax, xMin, yMin) // left
-      ) {
+      // Check if the line segment intersects with any edge of the brush rectangle
+      if (intersectsWithRectEdge(x1, y1, x2, y2)) {
         return true;
       }
     }
